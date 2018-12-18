@@ -297,6 +297,68 @@ func printFilenames(ch <-chan []string) {
 	}
 }
 
+func deletePromptPrintFilenames(ch <-chan []string) {
+	once := false
+	for filesets := range ch {
+		if once {
+			fmt.Println()
+		}
+		once = true
+
+		for i, v := range filesets {
+			fmt.Println("[", i, "]", v)
+		}
+
+		// prompt
+		fmt.Print("Enter index of file to be deleted: ")
+		var preserveIndex int
+		_, err := fmt.Scanf("%d", &preserveIndex)
+
+		if err != nil {
+			log.Panicf("Error encountered while reading index. Exiting.")
+			os.Exit(1)
+		}
+
+		// delete all except the index
+		for i, v := range filesets {
+			if i != preserveIndex {
+				out := os.Remove(v)
+				fmt.Println("Deleting resp for file - ", v, out)
+			} else {
+				fmt.Println("Preserving file - ", v)
+			}
+		}
+
+	}
+}
+
+func deleteSilentPrintFilenames(ch <-chan []string) {
+	once := false
+	for filesets := range ch {
+		if once {
+			fmt.Println()
+		}
+		once = true
+
+		for i, v := range filesets {
+			fmt.Println("[", i, "]", v)
+		}
+
+		preserveIndex := 0
+
+		// delete all except the index
+		for i, v := range filesets {
+			if i != preserveIndex {
+				out := os.Remove(v)
+				fmt.Println("Deleting resp for file - ", v, out)
+			} else {
+				fmt.Println("Preserving file - ", v)
+			}
+		}
+
+	}
+}
+
 var bufferSize int
 var hashType string
 var noEmpty bool
@@ -305,6 +367,8 @@ var perm bool
 var recurse bool
 var showVersion bool
 var verbose bool
+var deletePrompt bool
+var deleteFilesKeepOneCopy bool
 
 func init() {
 	flag.IntVar(&bufferSize, "buffer", 0, "buffer size used for channel pipeline")
@@ -315,6 +379,8 @@ func init() {
 	flag.BoolVar(&recurse, "recurse", false, "recurse")
 	flag.BoolVar(&showVersion, "version", false, "show version")
 	flag.BoolVar(&verbose, "verbose", false, "debug logging to stderr")
+	flag.BoolVar(&deletePrompt, "promptdelete", false, "Prompt for deletion of duplicate file by index")
+	flag.BoolVar(&deleteFilesKeepOneCopy, "deleteallkeepone", false, "Keep one file and delete rest from the duplicate set")
 	flag.Parse()
 
 	switch hashType {
@@ -346,5 +412,11 @@ func main() {
 
 	distillChan := distillFiles(hashChan)
 
-	printFilenames(distillChan)
+	if deletePrompt {
+		deletePromptPrintFilenames(distillChan)
+	} else if deleteFilesKeepOneCopy {
+		deleteSilentPrintFilenames(distillChan)
+	} else {
+		printFilenames(distillChan)
+	}
 }
